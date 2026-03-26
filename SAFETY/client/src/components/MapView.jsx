@@ -1,144 +1,185 @@
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { MOCK_ROUTES, RISK_ZONES } from '../data/mockData';
 
-// Public access token for development/demo (User should replace with their own)
-mapboxgl.accessToken = 'pk.eyJ1Ijoic2FiYXJpLXJhbSIsImEiOiJjbTdiaDljdzYwMm0xMmtxEHRmYXNqZWNyIn0.oP6V8LwM7-wN_S7-X8v8-A';
+const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
+mapboxgl.accessToken = MAPBOX_TOKEN;
 
-const MapView = () => {
+const MapView = ({ routes, activeRouteId, reports }) => {
   const mapContainer = useRef(null);
   const map = useRef(null);
-  const [lng, setLng] = useState(77.5946); // Bangalore center
-  const [lat, setLat] = useState(12.9716);
-  const [zoom, setZoom] = useState(14);
+  const [lng, setLng] = useState(78.9629); // Center of India (example)
+  const [lat, setLat] = useState(20.5937);
+  const [zoom, setZoom] = useState(5);
+
+  const markers = useRef([]);
 
   useEffect(() => {
-    if (map.current) return;
+    if (map.current) return; // initialize map only once
+    map.current = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: 'mapbox://styles/mapbox/light-v11', // default light mode
+      center: [lng, lat],
+      zoom: zoom
+    });
+
+    map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
     
-    console.log('Initializing Mapbox...');
-    
-    try {
-      map.current = new mapboxgl.Map({
-        container: mapContainer.current,
-        style: 'mapbox://styles/mapbox/navigation-night-v1',
-        center: [lng, lat],
-        zoom: zoom,
-        antialias: true,
-        failIfMajorPerformanceCaveat: false
-      });
-
-      map.current.on('error', (e) => {
-        console.error('MAPBOX_ERROR:', e.error?.message || e.error || 'Unknown Mapbox Error');
-      });
-
-      const handleResize = () => {
-        if (map.current) map.current.resize();
-      };
-
-      map.current.on('load', async () => {
-        console.log('Map Ready');
-        window.addEventListener('resize', handleResize);
-
-      // Add Crime Heatmap Layer
-      map.current.addSource('risk-zones', {
+    map.current.on('load', () => {
+      // Add routing-related sources
+      map.current.addSource('route', {
         type: 'geojson',
         data: {
-          type: 'FeatureCollection',
-          features: RISK_ZONES.map(zone => ({
-            type: 'Feature',
-            properties: { intensity: zone.intensity, message: zone.message },
-            geometry: {
-              type: 'Point',
-              coordinates: zone.center
-            }
-          }))
+          type: 'Feature',
+          properties: {},
+          geometry: {
+            type: 'LineString',
+            coordinates: []
+          }
         }
       });
 
       map.current.addLayer({
-        id: 'risk-heatmap',
-        type: 'heatmap',
-        source: 'risk-zones',
-        maxzoom: 18,
+        id: 'route',
+        type: 'line',
+        source: 'route',
+        layout: {
+          'line-join': 'round',
+          'line-cap': 'round'
+        },
         paint: {
-          'heatmap-weight': ['get', 'intensity'],
-          'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 0, 1, 18, 5],
-          'heatmap-color': [
-            'interpolate', ['linear'], ['heatmap-density'],
-            0, 'rgba(0,0,0,0)',
-            0.2, 'rgba(16, 185, 129, 0.2)',
-            0.5, 'rgba(245, 158, 11, 0.4)',
-            0.8, 'rgba(239, 68, 68, 0.6)',
-            1, 'rgba(239, 68, 68, 0.8)'
-          ],
-          'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 0, 5, 18, 30],
-          'heatmap-opacity': 0.7
+          'line-color': '#2563EB',
+          'line-width': 6,
+          'line-opacity': 0.8
         }
       });
 
-      // Add Routes (Emerald Glow & Electric Blue)
-      MOCK_ROUTES.forEach(route => {
-        map.current.addSource(route.id, {
-          type: 'geojson',
-          data: {
-            type: 'Feature',
-            properties: {},
-            geometry: {
-              type: 'LineString',
-              coordinates: route.path
-            }
-          }
-        });
-
-        map.current.addLayer({
-          id: route.id,
-          type: 'line',
-          source: route.id,
-          layout: {
-            'line-join': 'round',
-            'line-cap': 'round'
-          },
-          paint: {
-            'line-color': route.type === 'safe' ? '#10b981' : '#3b82f6',
-            'line-width': 8,
-            'line-opacity': 0.9
-          }
-        });
+      // Add crime heatmap source
+      map.current.addSource('crime-zones', {
+        type: 'geojson',
+        data: {
+          type: 'FeatureCollection',
+          features: []
+        }
       });
 
-      // Fetch Community Reports from Backend
-      try {
-        const res = await fetch('http://localhost:5000/api/reports');
-        const reports = await res.json();
-        reports.forEach(report => {
-           new mapboxgl.Marker({ color: '#ef4444' })
-             .setLngLat([report.location.lng, report.location.lat])
-             .setPopup(new mapboxgl.Popup().setHTML(`<b>Hazard:</b> ${report.comment}`))
-             .addTo(map.current);
-        });
-      } catch (e) {}
+      map.current.addLayer({
+        id: 'crime-heatmap',
+        type: 'heatmap',
+        source: 'crime-zones',
+        maxzoom: 15,
+        paint: {
+          'heatmap-weight': {
+            property: 'intensity',
+            type: 'exponential',
+            stops: [[1, 0], [6, 1]]
+          },
+          'heatmap-intensity': {
+            stops: [[11, 1], [15, 3]]
+          },
+          'heatmap-color': [
+            'interpolate', ['linear'], ['heatmap-density'],
+            0, 'rgba(236,222,239,0)',
+            0.2, 'rgb(208,209,230)',
+            0.4, 'rgb(166,189,219)',
+            0.6, 'rgb(103,169,207)',
+            0.8, 'rgb(28,144,153)'
+          ],
+          'heatmap-radius': {
+            stops: [[11, 15], [15, 20]]
+          },
+          'heatmap-opacity': {
+            default: 1,
+            stops: [[14, 1], [15, 0]]
+          }
+        }
+      });
+    });
+  }, []);
 
-      // Add Markers for current location
-      new mapboxgl.Marker({ color: '#2563eb' })
-        .setLngLat([77.5946, 12.9716])
-        .setPopup(new mapboxgl.Popup().setHTML('<h1>Current Position</h1>'))
-        .addTo(map.current);
+  // Update Route on Map
+  useEffect(() => {
+    if (!map.current || !routes || routes.length === 0) return;
+
+    const activeRoute = routes.find(r => r.id === activeRouteId) || routes[0];
+    const coordinates = activeRoute.geometry.coordinates;
+
+    const source = map.current.getSource('route');
+    if (source) {
+      source.setData({
+        type: 'Feature',
+        properties: {},
+        geometry: {
+          type: 'LineString',
+          coordinates: coordinates
+        }
+      });
+    }
+
+    // Fit map to route
+    const bounds = coordinates.reduce((acc, coord) => {
+      return acc.extend(coord);
+    }, new mapboxgl.LngLatBounds(coordinates[0], coordinates[0]));
+
+    map.current.fitBounds(bounds, { padding: 80 });
+
+  }, [routes, activeRouteId]);
+
+  // Update Markers and Heatmap from Reports
+  useEffect(() => {
+    if (!map.current || !reports) return;
+
+    // Clear old markers
+    markers.current.forEach(m => m.remove());
+    markers.current = [];
+
+    // Update Heatmap data
+    const crimeSource = map.current.getSource('crime-zones');
+    if (crimeSource) {
+      crimeSource.setData({
+        type: 'FeatureCollection',
+        features: reports.filter(r => r.type === 'crime').map(r => ({
+          type: 'Feature',
+          properties: { intensity: r.severity || 5 },
+          geometry: { type: 'Point', coordinates: [r.location.lng, r.location.lat] }
+        }))
+      });
+    }
+
+    // Add individual markers for other incidents
+    reports.forEach(report => {
+      if (report.type !== 'crime') {
+        const el = document.createElement('div');
+        el.className = 'marker';
+        el.style.backgroundColor = report.type === 'lighting' ? '#F59E0B' : '#EF4444';
+        el.style.width = '12px';
+        el.style.height = '12px';
+        el.style.borderRadius = '50%';
+        el.style.border = '2px solid white';
+        el.style.boxShadow = '0 0 10px rgba(0,0,0,0.3)';
+
+        const marker = new mapboxgl.Marker(el)
+          .setLngLat([report.location.lng, report.location.lat])
+          .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(`<h3>${report.type}</h3><p>${report.comment || 'No comment'}</p>`))
+          .addTo(map.current);
+        
+        markers.current.push(marker);
+      }
     });
 
-      // Cleanup
-      return () => {
-        if (handleResize) window.removeEventListener('resize', handleResize);
-        if (map.current) map.current.remove();
-      };
-    } catch (e) {
-      console.error('MAPBOX_INIT_ERROR:', e);
-    }
-  }, []);
+  }, [reports]);
 
   return (
     <div className="w-full h-full relative group">
-      <div ref={mapContainer} className="map-container" />
+      <div ref={mapContainer} className="map-container absolute inset-0 rounded-3xl" />
+      
+      {/* Map Overlay Stats */}
+      <div className="absolute top-6 left-6 z-10 space-y-2 pointer-events-none">
+         <div className="bg-white/80 backdrop-blur-md px-4 py-2 rounded-xl border border-slate-200 shadow-xl inline-flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="text-[10px] font-black uppercase tracking-widest text-slate-800">Safety Overlay Active</span>
+         </div>
+      </div>
     </div>
   );
 };

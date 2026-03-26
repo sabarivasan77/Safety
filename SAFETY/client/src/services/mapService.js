@@ -1,52 +1,56 @@
+import axios from 'axios';
+
+const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
+
 /**
- * Mapbox Directions API Integration Mock
- * Uses real path logic for polyline generation
+ * Fetches route directions from Mapbox.
+ * 
+ * @param {Array} coords - Array of [lng, lat] for start and end
+ * @returns {Promise<Array>} routes
  */
-export const fetchDirections = async (profile = 'walking', coordinates) => {
-  const token = import.meta.env.VITE_MAPBOX_TOKEN;
-  const coordString = coordinates.map(c => `${c[0]},${c[1]}`).join(';');
-  const url = `https://api.mapbox.com/directions/v5/mapbox/${profile}/${coordString}?alternatives=true&geometries=geojson&access_token=${token}`;
+export async function getDirections(start, end) {
+  const url = `https://api.mapbox.com/directions/v5/mapbox/walking/${start[0]},${start[1]};${end[0]},${end[1]}?geometries=geojson&alternatives=true&access_token=${MAPBOX_TOKEN}`;
   
   try {
-    const res = await fetch(url);
-    const data = await res.json();
-    return data;
-  } catch (e) {
-    console.error('Directions fetch error:', e);
-    return null;
+    const response = await axios.get(url);
+    return response.data.routes;
+  } catch (err) {
+    console.error('Error fetching Mapbox directions:', err);
+    throw err;
   }
-};
+}
 
 /**
- * Safety Scoring Logic (Industrial Standard)
+ * Geocodes an address to [lng, lat].
+ * 
+ * @param {string} query
+ * @returns {Promise<Array>} [lng, lat]
  */
-export const calculateSafetyScore = (route) => {
-  // route.crime (0-10), route.lighting (0-10), etc.
-  const score = (
-    (10 - route.crime) * 4.0 +
-    route.lighting * 2.0 +
-    route.crowd * 1.5 +
-    (10 - route.timeRisk) * 1.5 +
-    route.areaType * 1.0
-  );
-
-  const finalScore = Math.round(score);
+export async function geocode(query) {
+  const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_TOKEN}`;
   
-  let label = 'Risky';
-  let color = '#ef4444'; // Red
-
-  if (finalScore >= 75) {
-    label = 'Safe';
-    color = '#10b981'; // Green
-  } else if (finalScore >= 40) {
-    label = 'Moderate';
-    color = '#f59e0b'; // Amber
+  try {
+    const response = await axios.get(url);
+    if (response.data.features && response.data.features.length > 0) {
+      return response.data.features[0].center;
+    }
+    return null;
+  } catch (err) {
+    console.error('Error in geocoding:', err);
+    throw err;
   }
+}
 
-  return { 
-    score: finalScore, 
-    label, 
-    color,
-    description: `This route is ${label.toLowerCase()} because it avoids poorly lit zones and high-risk areas.`
-  };
-};
+/**
+ * Fetches community reports from our backend API.
+ */
+export async function getCommunityReports() {
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+  try {
+    const response = await axios.get(`${API_URL}/reports`);
+    return response.data;
+  } catch (err) {
+    console.error('Error fetching reports:', err);
+    return [];
+  }
+}

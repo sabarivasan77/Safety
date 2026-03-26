@@ -2,12 +2,21 @@
 
 :root {
   --font-sans: "Inter", system-ui, -apple-system, sans-serif;
-  --primary: #3b82f6;
-  --bg-main: #020617; /* Midnight Slate */
-  --bg-card: rgba(15, 23, 42, 0.7);
-  --text-main: #f8fafc;
-  --text-muted: #94a3b8;
-  --border-light: rgba(255, 255, 255, 0.1);
+  --primary: #2563EB;
+  --bg-main: #F1F5F9;
+  --bg-card: #FFFFFF;
+  --text-main: #111827;
+  --text-muted: #64748B;
+  --border-light: #E5E7EB;
+  --accent: #3B82F6;
+}
+
+.dark {
+  --bg-main: #0F172A;
+  --bg-card: #1E293B;
+  --text-main: #F8FAFC;
+  --text-muted: #94A3B8;
+  --border-light: #334155;
 }
 
 body {
@@ -24,9 +33,14 @@ body {
 }
 
 .premium-glass {
-  background: rgba(15, 23, 42, 0.6);
+  background: rgba(255, 255, 255, 0.7);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border-light);
+}
+
+.dark .premium-glass {
+  background: rgba(15, 23, 42, 0.6);
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
@@ -34,18 +48,7 @@ body {
   background: var(--bg-card);
   border: 1px solid var(--border-light);
   box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
-}
-
-.map-container {
-  width: 100%;
-  height: 100%;
-  min-height: 400px; /* Explicit minimum for Mapbox engine init */
-}
-
-.glass-dark {
-  background: rgba(15, 23, 42, 0.8);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1rem;
 }
 
 .btn-primary {
@@ -55,6 +58,11 @@ body {
 }
 
 .btn-primary:hover {
-  background-color: #1d4ed8;
+  background-color: #1D4ED8;
   transform: translateY(-1px);
+}
+
+.map-container {
+  width: 100%;
+  height: 100%;
 }
