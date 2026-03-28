@@ -8,17 +8,20 @@ export const osmService = {
   /**
    * Fetch buildings in a small bounding box around a point.
    */
-  async getBuildings(lat, lon, radius = 500) {
+  async getBuildings(lat, lon, radius = 2500) {
     // bbox: [min_lat, min_lon, max_lat, max_lon]
     const delta = radius / 111320; // roughly convert meters to degrees
     const bbox = `${lat - delta},${lon - delta},${lat + delta},${lon + delta}`;
     
+    // Optimization: Add node["natural"="tree"] to fetch vegetation, reduce timeout
     const query = `
       [out:json][timeout:25];
       (
         way["building"](${bbox});
         relation["building"](${bbox});
         way["highway"](${bbox});
+        node["highway"="traffic_signals"](${bbox});
+        node["natural"="tree"](${bbox});
       );
       out body;
       >;
@@ -53,13 +56,40 @@ export const osmService = {
 
     const roads = data.elements
       .filter(e => e.type === 'way' && e.tags && e.tags.highway)
-      .map(way => ({
-        id: way.id,
-        coords: way.nodes.map(nodeId => nodes[nodeId]).filter(c => !!c),
-        type: way.tags.highway,
-        lanes: way.tags.lanes ? parseInt(way.tags.lanes) : 2
+      .map(way => {
+        const type = way.tags.highway;
+        // Estimate width based on road type
+        let width = 4;
+        if (['motorway', 'trunk', 'primary'].includes(type)) width = 12;
+        else if (['secondary', 'tertiary'].includes(type)) width = 8;
+        else if (['residential', 'unclassified'].includes(type)) width = 6;
+        
+        return {
+          id: way.id,
+          coords: way.nodes.map(nodeId => nodes[nodeId]).filter(c => !!c),
+          type,
+          lanes: way.tags.lanes ? parseInt(way.tags.lanes) : 2,
+          width
+        };
+      });
+
+    const trafficSignals = data.elements
+      .filter(e => e.type === 'node' && e.tags && e.tags.highway === 'traffic_signals')
+      .map(node => ({
+        id: node.id,
+        lat: node.lat,
+        lon: node.lon
       }));
 
-    return { buildings, roads };
+    // Trees / vegetation
+    const trees = data.elements
+      .filter(e => e.type === 'node' && e.tags && e.tags.natural === 'tree')
+      .map(node => ({
+        id: node.id,
+        lat: node.lat,
+        lon: node.lon
+      }));
+
+    return { buildings, roads, trafficSignals, trees };
   }
 };

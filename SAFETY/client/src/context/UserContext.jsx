@@ -28,9 +28,10 @@ export const UserProvider = ({ children }) => {
    * EVERY 5 MINUTES (reduced for demo/testing but logic remains same)
    */
   const CHECK_IN_INTERVAL = 300; // 5 mins = 300s
-  const WARNING_DELAY = 60;     // 1 min = 60s
-  const ALARM_DELAY = 120;     // 2 mins = 120s
-  const SOS_AUTO_DELAY = 180;  // 3 mins = 180s
+  const WARNING_DELAY = 60;     // Reminder delay = 60s
+  const ALERT_DELAY = 120;      // Alert delay = 120s
+  const ALARM_DELAY = 180;      // Alarm delay = 180s
+  const SOS_AUTO_DELAY = 240;   // Auto SOS = 240s
 
   useEffect(() => {
     let interval;

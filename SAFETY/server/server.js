@@ -8,6 +8,7 @@ require('dotenv').config();
 const reportRoutes = require('./routes/reportRoutes');
 const emergencyRoutes = require('./routes/emergencyRoutes');
 const userRoutes = require('./routes/userRoutes');
+const authRoutes = require('./routes/authRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -19,7 +20,7 @@ app.use(express.json());
 app.use(morgan('dev'));
 
 // MongoDB Connection
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/saferoute';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/saferoute';
 mongoose.connect(MONGODB_URI)
   .then(() => console.log('✅ Connected to MongoDB Atlas'))
   .catch(err => console.error('❌ MongoDB Connection Error:', err));
@@ -32,6 +33,7 @@ app.get('/api/health', (req, res) => {
 app.use('/api/reports', reportRoutes);
 app.use('/api/emergency', emergencyRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/auth', authRoutes);
 
 // Error Handling Middleware
 app.use((err, req, res, next) => {

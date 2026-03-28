@@ -1,4 +1,4 @@
-const User = require('../models/User');
+const User = require('../models/User').default || require('../models/User');
 
 exports.triggerSOS = async (req, res) => {
   const { userId, location } = req.body;

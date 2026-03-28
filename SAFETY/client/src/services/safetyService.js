@@ -64,7 +64,6 @@ export const SafetyService = {
       };
       
       const tag = tagMap[type] || 'police';
-      const query = `[out:json];node(around:5000,${lat},${lng})[amenity=${tag}];out;`;
       
       // Use overpass API for advanced queries (or just nominatim search)
       // For simplicity/reliability, using Nominatim search within proximity
