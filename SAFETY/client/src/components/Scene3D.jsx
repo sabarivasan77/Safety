@@ -1,6 +1,6 @@
 import React, { useRef, useMemo, useState, useEffect } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls, PerspectiveCamera, ContactShadows, Environment, Stars, Float, Text, Trail, Sparkles, SpotLight, useDepthBuffer, PresentationControls, PointLight } from '@react-three/drei';
+import { OrbitControls, PerspectiveCamera, ContactShadows, Environment, Stars, Float, Text, Trail, Sparkles, SpotLight, useDepthBuffer, PresentationControls } from '@react-three/drei';
 import { useUser } from '../context/UserContext';
 import { osmService } from '../services/osmService';
 import * as THREE from 'three';

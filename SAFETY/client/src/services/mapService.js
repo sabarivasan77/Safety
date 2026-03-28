@@ -1,42 +1,44 @@
 import axios from 'axios';
 
-const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
-
 /**
- * Fetches route directions from Mapbox.
+ * Fetches route directions from OSRM (Free Open Source Routing Machine).
  * 
- * @param {Array} coords - Array of [lng, lat] for start and end
+ * @param {Array} start - [lng, lat]
+ * @param {Array} end - [lng, lat]
  * @returns {Promise<Array>} routes
  */
 export async function getDirections(start, end) {
-  const url = `https://api.mapbox.com/directions/v5/mapbox/walking/${start[0]},${start[1]};${end[0]},${end[1]}?geometries=geojson&alternatives=true&access_token=${MAPBOX_TOKEN}`;
+  const url = `https://router.project-osrm.org/route/v1/driving/${start[0]},${start[1]};${end[0]},${end[1]}?overview=full&geometries=geojson&alternatives=true`;
   
   try {
-    const response = await axios.get(url);
+    const response = await axios.get(url, {
+       headers: { 'Accept': 'application/json' }
+    });
     return response.data.routes;
   } catch (err) {
-    console.error('Error fetching Mapbox directions:', err);
+    console.error('Error fetching OSRM directions:', err);
     throw err;
   }
 }
 
 /**
- * Geocodes an address to [lng, lat].
+ * Geocodes an address to [lng, lat] using Nominatim (OSM Search).
  * 
  * @param {string} query
  * @returns {Promise<Array>} [lng, lat]
  */
 export async function geocode(query) {
-  const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_TOKEN}`;
+  const url = `/nominatim/search?q=${encodeURIComponent(query)}&format=json&limit=1`;
   
   try {
     const response = await axios.get(url);
-    if (response.data.features && response.data.features.length > 0) {
-      return response.data.features[0].center;
+    if (response.data && response.data.length > 0) {
+      const location = response.data[0];
+      return [parseFloat(location.lon), parseFloat(location.lat)];
     }
     return null;
   } catch (err) {
-    console.error('Error in geocoding:', err);
+    console.error('Error in geocoding (Nominatim):', err);
     throw err;
   }
 }

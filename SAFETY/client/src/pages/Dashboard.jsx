@@ -1,197 +1,252 @@
-import React, { useState, useEffect, useMemo, Suspense } from 'react';
-import SearchBar from '../components/SearchBar';
-import MapView from '../components/MapView';
-import RoutePanel from '../components/RoutePanel';
-import AlertBox from '../components/AlertBox';
-import { calculateSafety } from '../services/safetyService';
-import { getDirections, getCommunityReports } from '../services/mapService';
+import React, { useState, useEffect } from 'react';
 import { useUser } from '../context/UserContext';
-import { 
-  ShieldCheck, Map as MapIcon, Box, AlertTriangle, 
-  User, Bell, Settings, Share2, Heart, History,
-  Navigation, PhoneCall, ChevronRight, Menu
-} from 'lucide-react';
-
-const ThreeDView = React.lazy(() => import('../components/ThreeDView'));
+import SearchBar from '../components/SearchBar';
+import Map2D from '../components/Map2D';
+import Scene3D from '../components/Scene3D';
+import ChatBox from '../components/ChatBox';
+import NotificationSystem from '../components/NotificationSystem';
+import SOSPanel from '../components/SOSPanel';
+import { Shield, ShieldAlert, Navigation, Layers, Map, Eye, AlertCircle, Phone, Heart, Users, CheckCircle2, Info, Activity, MapPin } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { SafetyService } from '../services/safetyService';
 
 const Dashboard = () => {
-  const { user, saveRoute } = useUser();
-  const [viewMode, setViewMode] = useState('2D');
-  const [routes, setRoutes] = useState([]);
-  const [activeRouteId, setActiveRouteId] = useState(null);
-  const [reports, setReports] = useState([]);
-  const [alerts, setAlerts] = useState([
-    { id: 1, type: 'info', title: 'Safety Engine Online', message: 'Analyzing real-time incident data for your region.' }
-  ]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const { userState, setUserState, toggleMonitoring, activateSOS } = useUser();
+  const [safetyStats, setSafetyStats] = useState(null);
+  const [activeTab, setActiveTab] = useState('map'); // 'map', 'simulation'
 
   useEffect(() => {
-    const loadReports = async () => {
-      const data = await getCommunityReports();
-      setReports(data || []);
+    const fetchSafety = async () => {
+      const stats = await SafetyService.calculateSafetyScore(userState.currentLocation.lat, userState.currentLocation.lng);
+      setSafetyStats(stats);
     };
-    loadReports();
-    const interval = setInterval(loadReports, 60000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const handleRouteSearch = async (start, end) => {
-    setIsLoading(true);
-    try {
-      const fetchedRoutes = await getDirections(start, end);
-      const processedRoutes = fetchedRoutes.map((route, index) => {
-        const safetyData = calculateSafety({
-          crime: Math.random() * 50 + (index * 20),
-          lighting: Math.random() * 40 + 60 - (index * 15),
-          crowd: Math.random() * 40 + 50,
-          time: new Date().getHours() > 18 ? 80 : 20,
-          area: Math.random() * 40 + 10
-        });
-        return {
-          ...route,
-          id: `route-${index}`,
-          safety: safetyData,
-          segments: route.geometry.coordinates
-        };
-      });
-      setRoutes(processedRoutes);
-      setActiveRouteId(processedRoutes[0].id);
-      setAlerts(prev => [
-        { id: Date.now(), type: 'success', title: 'Route Found', message: `Safest path identified with ${processedRoutes[0].safety.label} rating.` },
-        ...prev
-      ]);
-    } catch (err) {
-      setAlerts(prev => [
-        { id: Date.now(), type: 'danger', title: 'Search Failed', message: 'Could not calculate routes.' },
-        ...prev
-      ]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSOS = async () => {
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-    try {
-      const resp = await fetch(`${API_URL}/emergency/sos`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: 'demo-user-1', location: { lat: 0, lng: 0 } })
-      });
-      if (resp.ok) {
-        alert("🚨 SOS SIGNAL TRIGGERED!");
-      }
-    } catch (err) {
-      alert("SOS connection failed.");
-    }
-  };
-
-  const handleSaveRoute = () => {
-     if (activeRouteData) {
-        saveRoute({
-           id: activeRouteData.id,
-           geometry: activeRouteData.geometry,
-           safety: activeRouteData.safety,
-           timestamp: new Date().toISOString()
-        });
-     }
-  };
-
-  const activeRouteData = useMemo(() => routes.find(r => r.id === activeRouteId), [routes, activeRouteId]);
+    fetchSafety();
+  }, [userState.currentLocation]);
 
   return (
-    <div className="flex flex-col h-screen w-screen bg-[#F1F5F9] text-[#111827] font-sans transition-colors overflow-hidden">
-      <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-8 z-50 shadow-sm shrink-0">
-        <div className="flex items-center gap-4">
-           <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 hover:bg-slate-100 rounded-xl md:hidden">
-             <Menu size={20} />
-           </button>
-           <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-2xl bg-blue-600 flex items-center justify-center text-white shadow-xl shadow-blue-500/30">
-                <ShieldCheck size={26} strokeWidth={2.5} />
+    <div className="relative w-full h-[100dvh] flex flex-col bg-slate-950 overflow-hidden font-sans text-slate-900">
+      {/* Top Header System - Modern, Transparent, Persistent */}
+      <header className="fixed top-0 left-0 right-0 z-[1001] p-4 lg:p-6 flex flex-col items-center gap-4 pointer-events-none">
+        
+        {/* Top Control Bar */}
+        <div className="w-full max-w-7xl flex items-center justify-between gap-4 pointer-events-auto">
+          {/* Logo & Status */}
+          <div className="flex items-center gap-3 p-2 pr-4 glass bg-white/10 border border-white/20 rounded-2xl shadow-2xl backdrop-blur-xl">
+            <div className="p-2.5 bg-blue-600 rounded-xl text-white shadow-lg shadow-blue-500/20">
+               <Shield size={22} strokeWidth={2.5} />
+            </div>
+            <div className="hidden sm:block">
+              <h1 className="text-sm font-black text-white tracking-tight uppercase leading-none">SafeRoute TN</h1>
+              <div className="flex items-center gap-1.5 mt-1">
+                <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest leading-none">AI Secure Active</p>
               </div>
-              <div>
-                 <h1 className="text-xl font-black italic tracking-tight uppercase">SafeRoute AI</h1>
-                 <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest mt-0.5">Safety Intelligence v2.0</p>
-              </div>
-           </div>
-        </div>
-        <SearchBar onSearch={handleRouteSearch} className="hidden lg:block absolute left-1/2 -translate-x-1/2 shadow-none" />
-        <div className="hidden md:flex items-center gap-2">
-           <button className="p-3 text-slate-400 hover:text-blue-600"><Bell size={20} /></button>
-           <button className="p-3 text-slate-400 hover:text-blue-600"><Settings size={20} /></button>
-           <div className="w-10 h-10 rounded-2xl bg-slate-100 flex items-center justify-center font-black">{user.name[0]}</div>
+            </div>
+          </div>
+
+          {/* Search System - Centralized */}
+          <div className="flex-1 max-w-xl">
+             <SearchBar />
+          </div>
+
+          {/* Action Hub */}
+          <div className="flex items-center gap-2 p-1.5 glass bg-white/10 border border-white/20 rounded-2xl shadow-2xl backdrop-blur-xl">
+            <button 
+              onClick={() => setActiveTab(activeTab === 'map' ? 'simulation' : 'map')}
+              className={`p-3 rounded-xl transition-all ${activeTab === 'simulation' ? 'bg-blue-600 text-white shadow-lg' : 'text-white/60 hover:text-white hover:bg-white/10'}`}
+              title="Toggle 2D/3D Mode"
+            >
+              {activeTab === 'map' ? <Layers size={20} /> : <Map size={20} />}
+            </button>
+            <button 
+              onClick={activateSOS}
+              className="p-3 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-all shadow-lg shadow-red-900/40"
+              title="Activate SOS"
+            >
+              <ShieldAlert size={20} />
+            </button>
+          </div>
         </div>
       </header>
 
-      <div className="flex-1 flex overflow-hidden relative">
-        <main className={`flex-1 relative overflow-hidden transition-all duration-500 ${isSidebarOpen ? 'md:mr-[30%] lg:mr-[25%]' : ''}`}>
-           <div className="absolute top-8 left-8 z-40 flex flex-col gap-4">
-              <div className="bg-white p-2 rounded-2xl shadow-2xl border border-slate-200 flex flex-col gap-1">
-                 <button onClick={() => setViewMode('2D')} className={`p-3.5 rounded-xl ${viewMode === '2D' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}>
-                   <MapIcon size={22} strokeWidth={2.5} />
-                 </button>
-                 <button onClick={() => setViewMode('3D')} className={`p-3.5 rounded-xl ${viewMode === '3D' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}>
-                   <Box size={22} strokeWidth={2.5} />
-                 </button>
-              </div>
-              <button onClick={handleSOS} className="w-14 h-14 bg-red-600 text-white rounded-2xl shadow-2xl shadow-red-500/40 flex items-center justify-center hover:scale-110 active:scale-95 transition-all">
-                 <PhoneCall size={24} strokeWidth={3} />
-              </button>
-           </div>
+      {/* Main View Engine */}
+      <main className="flex-1 w-full h-full">
+        <div className="w-full h-full relative">
+          <AnimatePresence mode="wait">
+             {activeTab === 'map' ? (
+               <motion.div 
+                 key="map-2d" 
+                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                 className="w-full h-full"
+               >
+                 <Map2D />
+               </motion.div>
+             ) : (
+               <motion.div 
+                 key="map-3d" 
+                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                 className="w-full h-full"
+               >
+                 <Scene3D />
+               </motion.div>
+             )}
+          </AnimatePresence>
 
-           <div className="w-full h-full">
-              {viewMode === '2D' ? (
-                <MapView routes={routes} activeRouteId={activeRouteId} reports={reports} />
+          {/* LEFT SIDE SYSTEM - Consolidated Monitoring Panel */}
+          <div className="absolute top-32 left-6 z-[900] flex flex-col gap-4 pointer-events-none sm:pointer-events-auto">
+            {/* GIS Simulation Card (3D Mode) */}
+            {activeTab === 'simulation' && (
+              <motion.div 
+                initial={{ x: -50, opacity: 0 }} animate={{ x: 0, opacity: 1 }}
+                className="p-5 glass border border-white/20 rounded-[32px] shadow-2xl bg-white/5 backdrop-blur-2xl"
+              >
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="p-2 bg-blue-500/20 rounded-lg text-blue-400">
+                    <Activity size={18} />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-black text-white uppercase tracking-widest">Digital Twin</h3>
+                    <p className="text-[10px] font-bold text-white/40 uppercase tracking-tighter">Real-time Terrain</p>
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <LegendItem color="bg-blue-600" label="Network Towers" />
+                  <LegendItem color="bg-red-500" label="Patrol Units" />
+                  <LegendItem color="bg-pink-500" label="Active Relatives" />
+                </div>
+                <div className="mt-5 pt-4 border-t border-white/10 flex items-center gap-3">
+                   <div className="w-3 h-3 border-2 border-white/20 border-t-blue-500 rounded-full animate-spin" />
+                   <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Hydrating GIS Data</span>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Safety Stats Card */}
+            <motion.div 
+              initial={{ x: -50, opacity: 0 }} animate={{ x: 0, opacity: 1 }}
+              transition={{ delay: 0.1 }}
+              className="p-6 glass border border-white/20 rounded-[32px] shadow-2xl bg-white/5 backdrop-blur-2xl w-full max-w-[280px]"
+            >
+              <div className="flex items-center justify-between mb-6">
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Zone Status</span>
+                <div className="px-2 py-1 bg-green-500 text-white rounded-lg text-[9px] font-black uppercase tracking-widest shadow-lg shadow-green-500/20">Live</div>
+              </div>
+
+              {safetyStats ? (
+                <>
+                  <div className="flex items-end gap-2 mb-6">
+                    <span className="text-5xl font-black text-white tracking-tighter">{safetyStats.score}%</span>
+                    <span className="text-[11px] font-bold text-white/50 mb-2 uppercase tracking-wide">Safe Score</span>
+                  </div>
+
+                  <div className="space-y-4">
+                    <ProgressStat label="Crowd Concentration" value={safetyStats.crowd} color="blue" />
+                    <ProgressStat label="Luminance Index" value={safetyStats.lighting} color="amber" />
+                  </div>
+                </>
               ) : (
-                <Suspense fallback={<div className="w-full h-full flex items-center justify-center bg-slate-50">Loading 3D Engine...</div>}>
-                   <ThreeDView routes={routes} activeRouteId={activeRouteId} reports={reports} />
-                </Suspense>
+                <div className="h-20 flex items-center justify-center">
+                  <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                </div>
               )}
-           </div>
-        </main>
 
-        <aside className={`fixed right-0 top-20 bottom-10 bg-white border-l border-slate-200 z-40 transition-transform duration-500 flex flex-col shadow-[-20px_0_50px_rgba(0,0,0,0.03)] ${isSidebarOpen ? 'translate-x-0 w-full md:w-[30%] lg:w-[25%]' : 'translate-x-full w-0'}`}>
-           <div className="flex-1 overflow-y-auto p-6 scrollbar-hide">
-              <div className="flex items-center justify-between mb-8">
-                 <h2 className="text-2xl font-black text-slate-900 leading-tight">Route Analysis</h2>
-                 <button className="p-2 hover:bg-slate-100 rounded-xl" onClick={() => setIsSidebarOpen(false)}><Share2 size={18} className="text-slate-400" /></button>
-              </div>
-              <RoutePanel routes={routes} activeRouteId={activeRouteId} onSelect={setActiveRouteId} safetyData={activeRouteData?.safety} />
-              <div className="mt-10 space-y-6">
-                 <div>
-                    <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-400 mb-4 ml-1">Tools & Actions</h3>
-                    <div className="grid grid-cols-2 gap-3">
-                       <div onClick={handleSaveRoute} className="bg-slate-50 p-4 rounded-2xl hover:bg-blue-50 transition-colors group cursor-pointer border border-slate-100"><Heart size={20} className="text-slate-400 group-hover:text-blue-600 mb-2"/><p className="text-xs font-black uppercase text-slate-600">Save</p></div>
-                       <div className="bg-slate-50 p-4 rounded-2xl hover:bg-emerald-50 transition-colors group cursor-pointer border border-slate-100"><History size={20} className="text-slate-400 group-hover:text-emerald-600 mb-2"/><p className="text-xs font-black uppercase text-slate-600">History</p></div>
-                    </div>
-                 </div>
-              </div>
-           </div>
-           <div className="p-6 border-t border-slate-100">
-              <button onClick={handleSOS} className="w-full bg-slate-900 hover:bg-black text-white py-4 rounded-2xl font-black uppercase text-sm flex items-center justify-center gap-3">
-                 <AlertTriangle size={20} className="text-red-500" /> Instant SOS
+              <button 
+                onClick={toggleMonitoring}
+                className={`w-full mt-8 py-4 rounded-2xl font-black text-[11px] uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-3 border ${
+                  userState.monitoringActive 
+                    ? 'bg-blue-600 text-white border-blue-500 shadow-xl shadow-blue-500/20' 
+                    : 'bg-white/5 text-white/60 border-white/10 hover:bg-white/10'
+                }`}
+              >
+                <div className={`w-2 h-2 rounded-full ${userState.monitoringActive ? 'bg-green-400 animate-pulse' : 'bg-white/20'}`} />
+                {userState.monitoringActive ? 'Secured active' : 'Start Safeguard'}
               </button>
-           </div>
-        </aside>
+            </motion.div>
+          </div>
+
+          {/* BOTTOM SYSTEMS - Modern Status Strip */}
+          <div className="absolute bottom-10 left-6 right-6 z-[1000] flex items-center justify-between pointer-events-none">
+             {/* SIM Telemetry HUD */}
+             <div className="flex items-center gap-4 pointer-events-auto">
+                <div className="px-6 py-4 glass border border-white/10 rounded-[28px] bg-black/40 backdrop-blur-3xl flex items-center gap-6">
+                   <div className="flex flex-col">
+                      <span className="text-[9px] font-black text-white/30 uppercase tracking-widest">Tower Load</span>
+                      <span className="text-xl font-black text-white tracking-tighter tabular-nums">742 <span className="text-[10px] text-white/40">PPS</span></span>
+                   </div>
+                   <div className="w-px h-8 bg-white/10" />
+                   <div className="flex flex-col">
+                      <span className="text-[9px] font-black text-white/30 uppercase tracking-widest">Camera Tracking</span>
+                      <span className="text-xl font-black text-blue-400 tracking-tighter uppercase">{activeTab === 'simulation' ? 'Following' : 'Map Mode'}</span>
+                   </div>
+                </div>
+             </div>
+
+             {/* Region Localization */}
+             <div className="hidden sm:flex items-center gap-4 pointer-events-auto">
+                <div className="px-6 py-4 glass border border-white/10 rounded-[28px] bg-black/40 backdrop-blur-3xl flex items-center gap-6">
+                   <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 bg-white/5 rounded-2xl flex items-center justify-center text-white/60">
+                         <MapPin size={20} />
+                      </div>
+                      <div className="flex flex-col">
+                         <span className="text-[9px] font-black text-white/30 uppercase tracking-widest">Engine Focus</span>
+                         <span className="text-xl font-black text-white tracking-tighter">Tamil Nadu</span>
+                      </div>
+                   </div>
+                   <div className="w-px h-8 bg-white/10" />
+                   <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 bg-white/5 rounded-2xl flex items-center justify-center text-white/60">
+                         <Eye size={20} />
+                      </div>
+                      <div className="flex flex-col">
+                         <span className="text-[9px] font-black text-white/30 uppercase tracking-widest">Visibility</span>
+                         <span className="text-xl font-black text-white tracking-tighter uppercase">Optimal</span>
+                      </div>
+                   </div>
+                </div>
+             </div>
+          </div>
+        </div>
+      </main>
+
+      {/* Global Safety Overlays */}
+      <ChatBox />
+      <NotificationSystem />
+      <SOSPanel />
+    </div>
+  );
+};
+
+const LegendItem = ({ color, label }) => (
+  <div className="flex items-center gap-3">
+    <div className={`w-3 h-3 rounded-md ${color} shadow-lg`} />
+    <span className="text-[10px] font-black text-white/70 uppercase tracking-widest">{label}</span>
+  </div>
+);
+
+const ProgressStat = ({ label, value, color }) => {
+  const getBarColor = () => {
+    switch(color) {
+      case 'blue': return 'bg-blue-500';
+      case 'amber': return 'bg-amber-500';
+      case 'green': return 'bg-green-500';
+      default: return 'bg-white/20';
+    }
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-tighter">
+        <span className="text-white/50">{label}</span>
+        <span className="text-white">{value}%</span>
       </div>
-
-      <footer className="h-10 bg-white border-t border-slate-200 flex items-center justify-between px-8 z-50 text-[10px] font-black uppercase tracking-widest text-slate-400">
-         <div className="flex items-center gap-8">
-            <span className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-emerald-500" /> Safety Core Online</span>
-            <span className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-blue-500" /> Mapbox API Connected</span>
-         </div>
-         <div>V2.0.1 Stable Release</div>
-      </footer>
-
-      <AlertBox alerts={alerts} onClose={(id) => setAlerts(prev => prev.filter(a => a.id !== id))} />
-      {isLoading && (
-         <div className="fixed inset-0 bg-slate-100/40 backdrop-blur-sm z-[100] flex flex-col items-center justify-center">
-            <div className="w-16 h-16 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin" />
-            <h2 className="text-xl font-black uppercase italic mt-6 animate-pulse">Analyzing Safest Route...</h2>
-         </div>
-      )}
+      <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+        <motion.div 
+          initial={{ width: 0 }}
+          animate={{ width: `${value}%` }}
+          className={`h-full ${getBarColor()}`}
+        />
+      </div>
     </div>
   );
 };

@@ -7,7 +7,7 @@ function App() {
   return (
     <Router>
       <UserProvider>
-        <div className="min-h-screen bg-slate-100 text-[#111827] font-sans selection:bg-blue-500 selection:text-white">
+        <div className="w-full min-h-screen bg-slate-950 text-slate-50 font-sans selection:bg-blue-600 selection:text-white">
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="*" element={<Navigate to="/" replace />} />
